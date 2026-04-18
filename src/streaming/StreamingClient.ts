@@ -60,6 +60,14 @@ export class StreamingClient {
     this.connected = false;
   }
 
+  private async safeAck(streamName: string, consumerGroup: string, msgId: string): Promise<void> {
+    try {
+      await this.redis.xack(streamName, consumerGroup, msgId);
+    } catch {
+      // Keep loop alive on transient Redis ACK errors.
+    }
+  }
+
   /**
    * Publish event to stream
    */
@@ -168,13 +176,13 @@ export class StreamingClient {
               try {
                 const event = this.unflattenEvent(data);
                 await callback(event);
-
-                // Acknowledge if using consumer group
-                if (consumerGroup && consumerName) {
-                  await this.redis.xack(streamName, consumerGroup, msgId);
-                }
               } catch (error) {
                 console.error(`[StreamingClient] Callback error:`, error);
+              }
+
+              // ACK outside try-catch: a callback error must not skip the ACK
+              if (consumerGroup && consumerName) {
+                await this.safeAck(streamName, consumerGroup, msgId);
               }
             }
           }
