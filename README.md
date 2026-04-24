@@ -1,4 +1,4 @@
-# @deepiri/shared-utils
+# @team-deepiri/shared-utils
 
 Shared utilities package for Deepiri microservices.
 
@@ -20,7 +20,7 @@ npm install
 The logger utility provides consistent logging across all services:
 
 ```javascript
-const { createLogger } = require('@deepiri/shared-utils');
+const { createLogger } = require('@team-deepiri/shared-utils');
 
 // Create a logger for your service
 const logger = createLogger('my-service');
