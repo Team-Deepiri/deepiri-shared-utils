@@ -15,6 +15,8 @@ export interface StreamEvent {
 export class StreamingClient {
   private redis: Redis;
   private connected: boolean = false;
+  private static readonly ACK_MAX_ATTEMPTS = 3;
+  private static readonly ACK_RETRY_BASE_DELAY_MS = 50;
 
   constructor(
     redisHost: string = process.env.REDIS_HOST || 'redis',
@@ -61,11 +63,94 @@ export class StreamingClient {
   }
 
   private async safeAck(streamName: string, consumerGroup: string, msgId: string): Promise<void> {
-    try {
-      await this.redis.xack(streamName, consumerGroup, msgId);
-    } catch {
-      // Keep loop alive on transient Redis ACK errors.
+    for (let attempt = 1; attempt <= StreamingClient.ACK_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const acked = await this.redis.xack(streamName, consumerGroup, msgId);
+
+        if (acked === 0) {
+          console.warn('[StreamingClient] XACK no-op (not pending/already acknowledged)', {
+            streamName,
+            consumerGroup,
+            msgId,
+          });
+        }
+
+        return;
+      } catch (error) {
+        const retryable = this.isRetryableAckError(error);
+        const nonRetryable = this.isNonRetryableAckError(error);
+        const exhausted = attempt >= StreamingClient.ACK_MAX_ATTEMPTS;
+
+        if (nonRetryable || !retryable || exhausted) {
+          const reason = nonRetryable ? 'non-retryable' : exhausted ? 'retry-exhausted' : 'non-retryable';
+          console.error(`[StreamingClient] XACK failed (${reason})`, {
+            streamName,
+            consumerGroup,
+            msgId,
+            attempt,
+            error: this.formatError(error),
+          });
+          return;
+        }
+
+        const delayMs = StreamingClient.ACK_RETRY_BASE_DELAY_MS * attempt;
+        console.warn('[StreamingClient] XACK transient failure, retrying', {
+          streamName,
+          consumerGroup,
+          msgId,
+          attempt,
+          delayMs,
+          error: this.formatError(error),
+        });
+        await this.sleep(delayMs);
+      }
     }
+  }
+
+  private isRetryableAckError(error: unknown): boolean {
+    const code = this.getErrorCode(error);
+    const message = this.formatError(error).toUpperCase();
+
+    if (code && ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND', 'NR_CLOSED'].includes(code)) {
+      return true;
+    }
+
+    return (
+      message.includes('CONNECTION IS CLOSED') ||
+      message.includes('TRYAGAIN') ||
+      message.includes('CLUSTERDOWN') ||
+      message.includes('LOADING') ||
+      message.includes('TIMEOUT') ||
+      message.includes('READONLY')
+    );
+  }
+
+  private isNonRetryableAckError(error: unknown): boolean {
+    const message = this.formatError(error).toUpperCase();
+    return message.includes('NOGROUP') || message.includes('WRONGTYPE');
+  }
+
+  private formatError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
+  }
+
+  private getErrorCode(error: unknown): string | null {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code: unknown }).code === 'string'
+    ) {
+      return ((error as { code: string }).code || '').toUpperCase();
+    }
+    return null;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
