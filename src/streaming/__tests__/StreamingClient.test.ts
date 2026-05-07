@@ -55,6 +55,7 @@ describe('StreamingClient safeAck', () => {
         streamName: 'stream-a',
         consumerGroup: 'group-a',
         msgId: '1-0',
+        rootCause: 'message-not-pending',
       })
     );
   });
@@ -78,6 +79,7 @@ describe('StreamingClient safeAck', () => {
         msgId: '1-0',
         attempt: 1,
         delayMs: 50,
+        rootCause: 'redis-transport-econnreset',
       })
     );
     expect(errorSpy).not.toHaveBeenCalled();
@@ -99,8 +101,47 @@ describe('StreamingClient safeAck', () => {
         consumerGroup: 'group-a',
         msgId: '1-0',
         attempt: 1,
+        rootCause: 'missing-consumer-group-or-stream',
       })
     );
+  });
+
+  it('classifies wrong Redis key type as a setup bug', async () => {
+    mockXack.mockRejectedValue(new Error('WRONGTYPE Operation against a key holding the wrong kind of value'));
+    const client = new StreamingClient('localhost', 6379, '');
+    const sleepSpy = jest.spyOn(client as any, 'sleep').mockResolvedValue(undefined);
+
+    await (client as any).safeAck('stream-a', 'group-a', '1-0');
+
+    expect(mockXack).toHaveBeenCalledTimes(1);
+    expect(sleepSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[StreamingClient] XACK failed (non-retryable)',
+      expect.objectContaining({
+        streamName: 'stream-a',
+        consumerGroup: 'group-a',
+        msgId: '1-0',
+        attempt: 1,
+        rootCause: 'stream-key-has-wrong-redis-type',
+      })
+    );
+  });
+
+  it('classifies Redis server state failures as retryable root causes', async () => {
+    mockXack.mockRejectedValueOnce(new Error('LOADING Redis is loading the dataset in memory')).mockResolvedValueOnce(1);
+    const client = new StreamingClient('localhost', 6379, '');
+    jest.spyOn(client as any, 'sleep').mockResolvedValue(undefined);
+
+    await (client as any).safeAck('stream-a', 'group-a', '1-0');
+
+    expect(mockXack).toHaveBeenCalledTimes(2);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[StreamingClient] XACK transient failure, retrying',
+      expect.objectContaining({
+        rootCause: 'redis-loading-dataset',
+      })
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('stops retrying after max attempts', async () => {
@@ -121,6 +162,7 @@ describe('StreamingClient safeAck', () => {
         consumerGroup: 'group-a',
         msgId: '1-0',
         attempt: 3,
+        rootCause: 'redis-transport-econnreset',
       })
     );
   });

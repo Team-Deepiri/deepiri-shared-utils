@@ -63,6 +63,15 @@ export class StreamingClient {
   }
 
   private async safeAck(streamName: string, consumerGroup: string, msgId: string): Promise<void> {
+    /*
+     * XACK failures are not just hypothetical:
+     * - transient Redis/connection states can happen after the callback succeeds but before ACK;
+     * - NOGROUP/WRONGTYPE indicate a stream setup or deployment bug and should not be retried;
+     * - XACK = 0 means Redis accepted the command but this message is no longer pending.
+     *
+     * Keep callback errors from pinning messages in the PEL, but keep ACK problems visible
+     * enough to diagnose the underlying Redis/consumer-group issue.
+     */
     for (let attempt = 1; attempt <= StreamingClient.ACK_MAX_ATTEMPTS; attempt += 1) {
       try {
         const acked = await this.redis.xack(streamName, consumerGroup, msgId);
@@ -72,6 +81,7 @@ export class StreamingClient {
             streamName,
             consumerGroup,
             msgId,
+            rootCause: 'message-not-pending',
           });
         }
 
@@ -88,6 +98,7 @@ export class StreamingClient {
             consumerGroup,
             msgId,
             attempt,
+            rootCause: this.describeAckFailure(error),
             error: this.formatError(error),
           });
           return;
@@ -100,6 +111,7 @@ export class StreamingClient {
           msgId,
           attempt,
           delayMs,
+          rootCause: this.describeAckFailure(error),
           error: this.formatError(error),
         });
         await this.sleep(delayMs);
@@ -128,6 +140,40 @@ export class StreamingClient {
   private isNonRetryableAckError(error: unknown): boolean {
     const message = this.formatError(error).toUpperCase();
     return message.includes('NOGROUP') || message.includes('WRONGTYPE');
+  }
+
+  private describeAckFailure(error: unknown): string {
+    const message = this.formatError(error).toUpperCase();
+    const code = this.getErrorCode(error);
+
+    if (message.includes('NOGROUP')) {
+      return 'missing-consumer-group-or-stream';
+    }
+    if (message.includes('WRONGTYPE')) {
+      return 'stream-key-has-wrong-redis-type';
+    }
+    if (code) {
+      return `redis-transport-${code.toLowerCase()}`;
+    }
+    if (message.includes('LOADING')) {
+      return 'redis-loading-dataset';
+    }
+    if (message.includes('CLUSTERDOWN')) {
+      return 'redis-cluster-down';
+    }
+    if (message.includes('READONLY')) {
+      return 'redis-readonly-replica';
+    }
+    if (message.includes('TRYAGAIN')) {
+      return 'redis-try-again';
+    }
+    if (message.includes('TIMEOUT')) {
+      return 'redis-timeout';
+    }
+    if (message.includes('CONNECTION IS CLOSED')) {
+      return 'redis-connection-closed';
+    }
+    return 'unknown-ack-failure';
   }
 
   private formatError(error: unknown): string {

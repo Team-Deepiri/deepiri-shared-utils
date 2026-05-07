@@ -32,6 +32,23 @@ secureLog('warn', 'Warning message');
 logger.debug('Debug information');
 ```
 
+### Redis Streams ACK Handling
+
+`StreamingClient.subscribe()` acknowledges consumer-group messages after the
+callback finishes, even when the callback throws. This prevents a bad handler
+from leaving messages pinned in the Redis Pending Entry List forever.
+
+ACK errors are still visible and classified:
+
+- `XACK = 0`: Redis accepted the command, but the message was not pending for
+  that group anymore.
+- Retryable Redis/transport states: connection resets, closed connections,
+  `LOADING`, `TRYAGAIN`, `CLUSTERDOWN`, `READONLY`, and timeouts.
+- Non-retryable setup bugs: `NOGROUP` and `WRONGTYPE`.
+
+This keeps consumer loops alive while preserving enough stream/group/message
+context to investigate the underlying Redis issue.
+
 ### Service-Specific Loggers
 
 Each service also has its own logger in `services/{service-name}/utils/logger.js`:
