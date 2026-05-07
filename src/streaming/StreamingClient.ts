@@ -368,5 +368,10 @@ export const StreamTopics = {
   PLATFORM_EVENTS: 'platform-events',
   AGI_DECISIONS: 'agi-decisions',
   TRAINING_EVENTS: 'training-events',
+  // LIS document routing streams (document.* namespace)
+  DOCUMENT_VECTORIZE: 'document.vectorize',
+  DOCUMENT_TRAINING: 'document.training',
+  DOCUMENT_STRUCTURED: 'document.structured',
+  DOCUMENT_ARTIFACTS: 'document.artifacts',
 } as const;
 

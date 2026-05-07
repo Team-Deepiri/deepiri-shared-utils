@@ -1,4 +1,4 @@
-import { StreamingClient } from '../StreamingClient';
+import { StreamingClient, StreamTopics } from '../StreamingClient';
 
 const mockXack = jest.fn();
 const mockOn = jest.fn();
@@ -165,5 +165,14 @@ describe('StreamingClient safeAck', () => {
         rootCause: 'redis-transport-econnreset',
       })
     );
+  });
+});
+
+describe('StreamTopics document routing constants', () => {
+  it('defines document.* stream names', () => {
+    expect(StreamTopics.DOCUMENT_VECTORIZE).toBe('document.vectorize');
+    expect(StreamTopics.DOCUMENT_TRAINING).toBe('document.training');
+    expect(StreamTopics.DOCUMENT_STRUCTURED).toBe('document.structured');
+    expect(StreamTopics.DOCUMENT_ARTIFACTS).toBe('document.artifacts');
   });
 });
