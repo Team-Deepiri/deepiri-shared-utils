@@ -38,6 +38,11 @@ logger.debug('Debug information');
 callback finishes, even when the callback throws. This prevents a bad handler
 from leaving messages pinned in the Redis Pending Entry List forever.
 
+The traced issue here is ACK placement: the previous implementation kept the
+callback and `XACK` in the same `try/catch`, so callback failures skipped ACK.
+The Redis `XACK` error classification is defensive hardening for future Redis
+runtime/setup failures.
+
 ACK errors are still visible and classified:
 
 - `XACK = 0`: Redis accepted the command, but the message was not pending for

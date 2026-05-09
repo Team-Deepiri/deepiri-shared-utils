@@ -64,10 +64,12 @@ export class StreamingClient {
 
   private async safeAck(streamName: string, consumerGroup: string, msgId: string): Promise<void> {
     /*
-     * XACK failures are not just hypothetical:
-     * - transient Redis/connection states can happen after the callback succeeds but before ACK;
-     * - NOGROUP/WRONGTYPE indicate a stream setup or deployment bug and should not be retried;
-     * - XACK = 0 means Redis accepted the command but this message is no longer pending.
+     * The traced bug was ACK placement: the previous implementation put the
+     * callback and XACK in the same try/catch, so callback failures skipped
+     * the ACK and could leave messages pending. The XACK failure classification
+     * below is defensive handling for future Redis/runtime failures:
+     * transient connection states are retried, NOGROUP/WRONGTYPE expose setup
+     * bugs, and XACK = 0 is logged as a no-op pending-state mismatch.
      *
      * Keep callback errors from pinning messages in the PEL, but keep ACK problems visible
      * enough to diagnose the underlying Redis/consumer-group issue.
@@ -374,4 +376,3 @@ export const StreamTopics = {
   DOCUMENT_STRUCTURED: 'document.structured',
   DOCUMENT_ARTIFACTS: 'document.artifacts',
 } as const;
-
