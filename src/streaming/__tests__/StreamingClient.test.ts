@@ -166,6 +166,29 @@ describe('StreamingClient safeAck', () => {
       })
     );
   });
+
+  it('logs unknown xack failures instead of swallowing them silently', async () => {
+    mockXack.mockRejectedValue(new Error('ERR unexpected Redis ack failure'));
+
+    const client = new StreamingClient('localhost', 6379, '');
+    const sleepSpy = jest.spyOn(client as any, 'sleep').mockResolvedValue(undefined);
+
+    await (client as any).safeAck('stream-a', 'group-a', '1-0');
+
+    expect(mockXack).toHaveBeenCalledTimes(1);
+    expect(sleepSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[StreamingClient] XACK failed (non-retryable)',
+      expect.objectContaining({
+        streamName: 'stream-a',
+        consumerGroup: 'group-a',
+        msgId: '1-0',
+        attempt: 1,
+        rootCause: 'unknown-ack-failure',
+        error: 'ERR unexpected Redis ack failure',
+      })
+    );
+  });
 });
 
 describe('StreamTopics document routing constants', () => {
