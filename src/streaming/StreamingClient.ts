@@ -15,6 +15,8 @@ export interface StreamEvent {
 export class StreamingClient {
   private redis: Redis;
   private connected: boolean = false;
+  private static readonly ACK_MAX_ATTEMPTS = 3;
+  private static readonly ACK_RETRY_BASE_DELAY_MS = 50;
 
   constructor(
     redisHost: string = process.env.REDIS_HOST || 'redis',
@@ -58,6 +60,145 @@ export class StreamingClient {
   async disconnect(): Promise<void> {
     await this.redis.quit();
     this.connected = false;
+  }
+
+  private async safeAck(streamName: string, consumerGroup: string, msgId: string): Promise<void> {
+    /*
+     * The traced bug was ACK placement: the previous implementation put the
+     * callback and XACK in the same try/catch, so callback failures skipped
+     * the ACK and could leave messages pending. The XACK failure classification
+     * below is defensive handling for future Redis/runtime failures:
+     * transient connection states are retried, NOGROUP/WRONGTYPE expose setup
+     * bugs, and XACK = 0 is logged as a no-op pending-state mismatch.
+     *
+     * Keep callback errors from pinning messages in the PEL, but keep ACK problems visible
+     * enough to diagnose the underlying Redis/consumer-group issue.
+     */
+    for (let attempt = 1; attempt <= StreamingClient.ACK_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const acked = await this.redis.xack(streamName, consumerGroup, msgId);
+
+        if (acked === 0) {
+          console.warn('[StreamingClient] XACK no-op (not pending/already acknowledged)', {
+            streamName,
+            consumerGroup,
+            msgId,
+            rootCause: 'message-not-pending',
+          });
+        }
+
+        return;
+      } catch (error) {
+        const retryable = this.isRetryableAckError(error);
+        const nonRetryable = this.isNonRetryableAckError(error);
+        const exhausted = attempt >= StreamingClient.ACK_MAX_ATTEMPTS;
+
+        if (nonRetryable || !retryable || exhausted) {
+          const reason = nonRetryable ? 'non-retryable' : exhausted ? 'retry-exhausted' : 'non-retryable';
+          console.error(`[StreamingClient] XACK failed (${reason})`, {
+            streamName,
+            consumerGroup,
+            msgId,
+            attempt,
+            rootCause: this.describeAckFailure(error),
+            error: this.formatError(error),
+          });
+          return;
+        }
+
+        const delayMs = StreamingClient.ACK_RETRY_BASE_DELAY_MS * attempt;
+        console.warn('[StreamingClient] XACK transient failure, retrying', {
+          streamName,
+          consumerGroup,
+          msgId,
+          attempt,
+          delayMs,
+          rootCause: this.describeAckFailure(error),
+          error: this.formatError(error),
+        });
+        await this.sleep(delayMs);
+      }
+    }
+  }
+
+  private isRetryableAckError(error: unknown): boolean {
+    const code = this.getErrorCode(error);
+    const message = this.formatError(error).toUpperCase();
+
+    if (code && ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND', 'NR_CLOSED'].includes(code)) {
+      return true;
+    }
+
+    return (
+      message.includes('CONNECTION IS CLOSED') ||
+      message.includes('TRYAGAIN') ||
+      message.includes('CLUSTERDOWN') ||
+      message.includes('LOADING') ||
+      message.includes('TIMEOUT') ||
+      message.includes('READONLY')
+    );
+  }
+
+  private isNonRetryableAckError(error: unknown): boolean {
+    const message = this.formatError(error).toUpperCase();
+    return message.includes('NOGROUP') || message.includes('WRONGTYPE');
+  }
+
+  private describeAckFailure(error: unknown): string {
+    const message = this.formatError(error).toUpperCase();
+    const code = this.getErrorCode(error);
+
+    if (message.includes('NOGROUP')) {
+      return 'missing-consumer-group-or-stream';
+    }
+    if (message.includes('WRONGTYPE')) {
+      return 'stream-key-has-wrong-redis-type';
+    }
+    if (code) {
+      return `redis-transport-${code.toLowerCase()}`;
+    }
+    if (message.includes('LOADING')) {
+      return 'redis-loading-dataset';
+    }
+    if (message.includes('CLUSTERDOWN')) {
+      return 'redis-cluster-down';
+    }
+    if (message.includes('READONLY')) {
+      return 'redis-readonly-replica';
+    }
+    if (message.includes('TRYAGAIN')) {
+      return 'redis-try-again';
+    }
+    if (message.includes('TIMEOUT')) {
+      return 'redis-timeout';
+    }
+    if (message.includes('CONNECTION IS CLOSED')) {
+      return 'redis-connection-closed';
+    }
+    return 'unknown-ack-failure';
+  }
+
+  private formatError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
+  }
+
+  private getErrorCode(error: unknown): string | null {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      typeof (error as { code: unknown }).code === 'string'
+    ) {
+      return ((error as { code: string }).code || '').toUpperCase();
+    }
+    return null;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -168,13 +309,13 @@ export class StreamingClient {
               try {
                 const event = this.unflattenEvent(data);
                 await callback(event);
-
-                // Acknowledge if using consumer group
-                if (consumerGroup && consumerName) {
-                  await this.redis.xack(streamName, consumerGroup, msgId);
-                }
               } catch (error) {
                 console.error(`[StreamingClient] Callback error:`, error);
+              }
+
+              // ACK outside try-catch: a callback error must not skip the ACK
+              if (consumerGroup && consumerName) {
+                await this.safeAck(streamName, consumerGroup, msgId);
               }
             }
           }
@@ -229,5 +370,9 @@ export const StreamTopics = {
   PLATFORM_EVENTS: 'platform-events',
   AGI_DECISIONS: 'agi-decisions',
   TRAINING_EVENTS: 'training-events',
+  // LIS document routing streams (document.* namespace)
+  DOCUMENT_VECTORIZE: 'document.vectorize',
+  DOCUMENT_TRAINING: 'document.training',
+  DOCUMENT_STRUCTURED: 'document.structured',
+  DOCUMENT_ARTIFACTS: 'document.artifacts',
 } as const;
-
