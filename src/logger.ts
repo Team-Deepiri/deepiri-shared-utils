@@ -2,11 +2,44 @@ import winston from 'winston';
 import path from 'path';
 import fs from 'fs';
 
+// Prefer the centralized deepiri-logger package when present (top-level
+// submodule). This keeps existing import sites unchanged while allowing a
+// single implementation to drive logging/PII masking.
+function tryUseDeepiriLogger(serviceName: string) {
+  try {
+    // Path from this file to repository root: ../../../../deepiri-logger
+    // Resolve both built `dist` and `src` entrypoints.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const deepiriPath = path.resolve(__dirname, '..', '..', '..', '..', 'deepiri-logger', 'nodejs');
+    // Try dist first
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const dl = require(path.join(deepiriPath, 'dist'));
+      if (dl && typeof dl.createLogger === 'function') return dl.createLogger(serviceName, '0.0.0');
+    } catch (_) {
+      // try src
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const dl = require(path.join(deepiriPath, 'src'));
+        if (dl && typeof dl.createLogger === 'function') return dl.createLogger(serviceName, '0.0.0');
+      } catch (_e) {
+        return null;
+      }
+    }
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
  * Shared Logger Utility for Deepiri Microservices
  * Provides consistent logging across all services
  */
 export function createLogger(serviceName: string = 'service'): winston.Logger {
+  // If a centralized deepiri-logger is available, use it.
+  const dlLogger = tryUseDeepiriLogger(serviceName);
+  if (dlLogger) return dlLogger as winston.Logger;
+
   // Determine logs directory based on environment
   const isDocker = process.env.NODE_ENV === 'production' || process.env.DOCKER === 'true' || fs.existsSync('/.dockerenv');
   const defaultLogsDir = isDocker ? '/app/logs' : path.join(process.cwd(), 'logs');
