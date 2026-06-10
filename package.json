@@ -8,9 +8,9 @@
     "registry": "https://registry.npmjs.org/"
   },
   "repository": {
-  "type": "git",
-  "url": "git+https://github.com/Team-Deepiri/deepiri-shared-utils.git",
-  "directory": "platform-services/shared/deepiri-shared-utils"
+    "type": "git",
+    "url": "git+https://github.com/Team-Deepiri/deepiri-shared-utils.git",
+    "directory": "platform-services/shared/deepiri-shared-utils"
   },
   "files": [
     "dist",
@@ -37,5 +37,18 @@
     "node-notifier": "^10.0.1",
     "ts-jest": "^29.1.0",
     "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "axios": "^1.16.0",
+    "qs": "^6.15.2",
+    "uuid": "^11.1.1",
+    "ws": "^8.20.1",
+    "minimatch": "^9.0.7",
+    "lodash": "^4.18.0",
+    "node-forge": "^1.4.0",
+    "socket.io-parser": "^4.2.6",
+    "router": {
+      "path-to-regexp": "8.4.0"
+    }
   }
 }
