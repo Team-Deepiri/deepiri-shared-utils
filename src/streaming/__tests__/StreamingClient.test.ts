@@ -211,4 +211,10 @@ describe('StreamTopics document routing constants', () => {
     expect(StreamTopics.PIPELINE_SPLICE_EVENTS).toBe('pipeline.splice.events');
     expect(StreamTopics.TRAINING_JOBS).toBe('training-jobs');
   });
+
+  it('exports an immutable Sugar Glider allowlist', () => {
+    expect(SUGAR_GLIDER_STREAM_ALLOWLIST).toContain('pipeline.pressure.events');
+    expect(SUGAR_GLIDER_STREAM_ALLOWLIST).toContain('pipeline.helox-training.raw');
+    expect(Object.isFrozen(SUGAR_GLIDER_STREAM_ALLOWLIST)).toBe(true);
+  });
 });

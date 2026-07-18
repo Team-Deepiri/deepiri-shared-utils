@@ -387,5 +387,27 @@ export const StreamTopics = {
   PIPELINE_METRICS: 'pipeline.metrics',
 } as const;
 
-/** Canonical Sugar Glider SIDECAR_PUBLISH/CONSUME allowlist */
-export const SUGAR_GLIDER_STREAM_ALLOWLIST = Object.values(StreamTopics);
+/**
+ * Explicit Sugar Glider publish/consume allowlist (immutable).
+ * Keep this deliberate — do not auto-derive from StreamTopics so experimental
+ * topics are not silently authorized.
+ */
+export const SUGAR_GLIDER_STREAM_ALLOWLIST: readonly string[] = Object.freeze([
+  StreamTopics.MODEL_EVENTS,
+  StreamTopics.INFERENCE_EVENTS,
+  StreamTopics.PLATFORM_EVENTS,
+  StreamTopics.AGI_DECISIONS,
+  StreamTopics.TRAINING_EVENTS,
+  StreamTopics.TRAINING_JOBS,
+  StreamTopics.DOCUMENT_VECTORIZE,
+  StreamTopics.DOCUMENT_TRAINING,
+  StreamTopics.DOCUMENT_STRUCTURED,
+  StreamTopics.DOCUMENT_ARTIFACTS,
+  StreamTopics.HELOX_TRAINING_RAW,
+  StreamTopics.HELOX_TRAINING_STRUCTURED,
+  StreamTopics.PIPELINE_PRESSURE_EVENTS,
+  StreamTopics.PIPELINE_ARTIFACT_INVALIDATION,
+  StreamTopics.PIPELINE_SPLICE_EVENTS,
+  StreamTopics.PIPELINE_DEAD_LETTER,
+  StreamTopics.PIPELINE_METRICS,
+]);
