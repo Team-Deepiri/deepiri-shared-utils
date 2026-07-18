@@ -370,9 +370,22 @@ export const StreamTopics = {
   PLATFORM_EVENTS: 'platform-events',
   AGI_DECISIONS: 'agi-decisions',
   TRAINING_EVENTS: 'training-events',
+  TRAINING_JOBS: 'training-jobs',
   // LIS document routing streams (document.* namespace)
   DOCUMENT_VECTORIZE: 'document.vectorize',
   DOCUMENT_TRAINING: 'document.training',
   DOCUMENT_STRUCTURED: 'document.structured',
   DOCUMENT_ARTIFACTS: 'document.artifacts',
+  // Cyrex → Helox training signals
+  HELOX_TRAINING_RAW: 'pipeline.helox-training.raw',
+  HELOX_TRAINING_STRUCTURED: 'pipeline.helox-training.structured',
+  // Cyrex AGI pipeline bus
+  PIPELINE_PRESSURE_EVENTS: 'pipeline.pressure.events',
+  PIPELINE_ARTIFACT_INVALIDATION: 'pipeline.artifact.invalidation',
+  PIPELINE_SPLICE_EVENTS: 'pipeline.splice.events',
+  PIPELINE_DEAD_LETTER: 'pipeline.dead-letter',
+  PIPELINE_METRICS: 'pipeline.metrics',
 } as const;
+
+/** Canonical Sugar Glider SIDECAR_PUBLISH/CONSUME allowlist */
+export const SUGAR_GLIDER_STREAM_ALLOWLIST = Object.values(StreamTopics);

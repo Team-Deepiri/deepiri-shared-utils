@@ -198,4 +198,17 @@ describe('StreamTopics document routing constants', () => {
     expect(StreamTopics.DOCUMENT_STRUCTURED).toBe('document.structured');
     expect(StreamTopics.DOCUMENT_ARTIFACTS).toBe('document.artifacts');
   });
+
+  it('defines Helox training and AGI pipeline bus streams', () => {
+    expect(StreamTopics.HELOX_TRAINING_RAW).toBe('pipeline.helox-training.raw');
+    expect(StreamTopics.HELOX_TRAINING_STRUCTURED).toBe(
+      'pipeline.helox-training.structured'
+    );
+    expect(StreamTopics.PIPELINE_PRESSURE_EVENTS).toBe('pipeline.pressure.events');
+    expect(StreamTopics.PIPELINE_ARTIFACT_INVALIDATION).toBe(
+      'pipeline.artifact.invalidation'
+    );
+    expect(StreamTopics.PIPELINE_SPLICE_EVENTS).toBe('pipeline.splice.events');
+    expect(StreamTopics.TRAINING_JOBS).toBe('training-jobs');
+  });
 });
