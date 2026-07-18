@@ -1,4 +1,4 @@
-import { StreamingClient, StreamTopics } from '../StreamingClient';
+import { StreamingClient, StreamTopics, SUGAR_GLIDER_STREAM_ALLOWLIST } from '../StreamingClient';
 
 const mockXack = jest.fn();
 const mockOn = jest.fn();
