@@ -370,9 +370,44 @@ export const StreamTopics = {
   PLATFORM_EVENTS: 'platform-events',
   AGI_DECISIONS: 'agi-decisions',
   TRAINING_EVENTS: 'training-events',
+  TRAINING_JOBS: 'training-jobs',
   // LIS document routing streams (document.* namespace)
   DOCUMENT_VECTORIZE: 'document.vectorize',
   DOCUMENT_TRAINING: 'document.training',
   DOCUMENT_STRUCTURED: 'document.structured',
   DOCUMENT_ARTIFACTS: 'document.artifacts',
+  // Cyrex → Helox training signals
+  HELOX_TRAINING_RAW: 'pipeline.helox-training.raw',
+  HELOX_TRAINING_STRUCTURED: 'pipeline.helox-training.structured',
+  // Cyrex AGI pipeline bus
+  PIPELINE_PRESSURE_EVENTS: 'pipeline.pressure.events',
+  PIPELINE_ARTIFACT_INVALIDATION: 'pipeline.artifact.invalidation',
+  PIPELINE_SPLICE_EVENTS: 'pipeline.splice.events',
+  PIPELINE_DEAD_LETTER: 'pipeline.dead-letter',
+  PIPELINE_METRICS: 'pipeline.metrics',
 } as const;
+
+/**
+ * Explicit Sugar Glider publish/consume allowlist (immutable).
+ * Keep this deliberate — do not auto-derive from StreamTopics so experimental
+ * topics are not silently authorized.
+ */
+export const SUGAR_GLIDER_STREAM_ALLOWLIST: readonly string[] = Object.freeze([
+  StreamTopics.MODEL_EVENTS,
+  StreamTopics.INFERENCE_EVENTS,
+  StreamTopics.PLATFORM_EVENTS,
+  StreamTopics.AGI_DECISIONS,
+  StreamTopics.TRAINING_EVENTS,
+  StreamTopics.TRAINING_JOBS,
+  StreamTopics.DOCUMENT_VECTORIZE,
+  StreamTopics.DOCUMENT_TRAINING,
+  StreamTopics.DOCUMENT_STRUCTURED,
+  StreamTopics.DOCUMENT_ARTIFACTS,
+  StreamTopics.HELOX_TRAINING_RAW,
+  StreamTopics.HELOX_TRAINING_STRUCTURED,
+  StreamTopics.PIPELINE_PRESSURE_EVENTS,
+  StreamTopics.PIPELINE_ARTIFACT_INVALIDATION,
+  StreamTopics.PIPELINE_SPLICE_EVENTS,
+  StreamTopics.PIPELINE_DEAD_LETTER,
+  StreamTopics.PIPELINE_METRICS,
+]);

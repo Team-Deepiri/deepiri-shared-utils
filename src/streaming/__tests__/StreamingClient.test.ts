@@ -1,4 +1,4 @@
-import { StreamingClient, StreamTopics } from '../StreamingClient';
+import { StreamingClient, StreamTopics, SUGAR_GLIDER_STREAM_ALLOWLIST } from '../StreamingClient';
 
 const mockXack = jest.fn();
 const mockOn = jest.fn();
@@ -197,5 +197,24 @@ describe('StreamTopics document routing constants', () => {
     expect(StreamTopics.DOCUMENT_TRAINING).toBe('document.training');
     expect(StreamTopics.DOCUMENT_STRUCTURED).toBe('document.structured');
     expect(StreamTopics.DOCUMENT_ARTIFACTS).toBe('document.artifacts');
+  });
+
+  it('defines Helox training and AGI pipeline bus streams', () => {
+    expect(StreamTopics.HELOX_TRAINING_RAW).toBe('pipeline.helox-training.raw');
+    expect(StreamTopics.HELOX_TRAINING_STRUCTURED).toBe(
+      'pipeline.helox-training.structured'
+    );
+    expect(StreamTopics.PIPELINE_PRESSURE_EVENTS).toBe('pipeline.pressure.events');
+    expect(StreamTopics.PIPELINE_ARTIFACT_INVALIDATION).toBe(
+      'pipeline.artifact.invalidation'
+    );
+    expect(StreamTopics.PIPELINE_SPLICE_EVENTS).toBe('pipeline.splice.events');
+    expect(StreamTopics.TRAINING_JOBS).toBe('training-jobs');
+  });
+
+  it('exports an immutable Sugar Glider allowlist', () => {
+    expect(SUGAR_GLIDER_STREAM_ALLOWLIST).toContain('pipeline.pressure.events');
+    expect(SUGAR_GLIDER_STREAM_ALLOWLIST).toContain('pipeline.helox-training.raw');
+    expect(Object.isFrozen(SUGAR_GLIDER_STREAM_ALLOWLIST)).toBe(true);
   });
 });
