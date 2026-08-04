@@ -1,11 +1,11 @@
 {
   "name": "@team-deepiri/shared-utils",
-  "version": "1.0.0",
+  "version": "1.2.5",
   "description": "Shared utilities for Deepiri microservices",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://npm.pkg.github.com"
   },
   "repository": {
     "type": "git",
